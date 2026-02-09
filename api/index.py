@@ -285,6 +285,66 @@ def checkin():
     return jsonify(result)
 
 
+@app.route('/api/upload_signature', methods=['POST'])
+def upload_signature():
+    """Upload driver signature to Manhattan Document Manager for each ASN/PO"""
+    data = request.json
+    org = data.get('org')
+    token = data.get('token')
+    object_type_id = data.get('objectTypeId')  # "ASN" or "PurchaseOrder"
+    object_id = data.get('objectId')
+    filename = data.get('filename')
+    file_data = data.get('fileData')  # Base64 encoded PNG
+    notes = data.get('notes', '')
+
+    if not all([org, token, object_type_id, object_id, filename, file_data]):
+        return jsonify({"success": False, "error": "Missing required fields"})
+
+    url = f"https://{API_HOST}/document-manager/api/document-manager/uploadDocuments"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "selectedOrganization": org.upper(),
+        "selectedLocation": f"{org.upper()}-DM1"
+    }
+    payload = {
+        "ObjectTypeId": object_type_id,
+        "ObjectId": object_id,
+        "DocumentCategoryId": "DriverSignature",
+        "Action": "overWrite",
+        "Description": "Uploaded via Check-In Kiosk",
+        "DocumentManagerFiles": [{
+            "FileName": filename,
+            "DocumentName": "Driver Signature",
+            "Description": "Driver signature captured during check-in",
+            "Notes": notes,
+            "FileData": file_data
+        }]
+    }
+
+    try:
+        print(f"[SIGNATURE UPLOAD] {object_type_id}: {object_id}, File: {filename}")
+        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        print(f"[SIGNATURE UPLOAD] Status: {r.status_code}")
+        print(f"[SIGNATURE UPLOAD] Response: {r.text[:2000]}")
+
+        if r.ok:
+            try:
+                res_json = r.json()
+                if res_json.get("success") is False:
+                    err_list = res_json.get("errors", []) or res_json.get("exceptions", [])
+                    err_msg = err_list[0].get("message") if err_list else "Upload failed"
+                    return jsonify({"success": False, "error": err_msg})
+            except:
+                pass
+            return jsonify({"success": True, "message": f"Signature uploaded for {object_type_id} {object_id}"})
+        else:
+            return jsonify({"success": False, "error": f"Upload failed (HTTP {r.status_code})"})
+    except Exception as e:
+        print(f"[SIGNATURE UPLOAD] Exception: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
+
+
 # === FALLBACK: Serve index.html for SPA (Critical for Vercel) ===
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

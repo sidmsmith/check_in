@@ -1184,6 +1184,10 @@
       const checkinDuration = Date.now() - checkinStartTime;
 
       if (res.success) {
+        // Upload signature BEFORE resetting form (need canvas data)
+        status('Uploading signature...', 'success');
+        await uploadSignaturesForAppointment(appt, org);
+
         checkinMessage.textContent = `${res.message || 'Check-in successful'}`;
         checkinModal.show();
         
@@ -1242,6 +1246,122 @@
         validateCheckIn();
       }
     }
+    // ===== SIGNATURE ENHANCEMENT & UPLOAD =====
+
+    // Enhance signature image with watermark (AppointmentId + object label)
+    function enhanceSignatureImage(appointmentId, objectLabel) {
+      return new Promise((resolve) => {
+        const ratio = window.devicePixelRatio || 1;
+        const origW = sigCanvas.width / ratio;
+        const origH = sigCanvas.height / ratio;
+
+        // Header layout
+        const padding = 10;
+        const lineHeight = 18;
+        const textLines = [
+          `Appointment: ${appointmentId}`,
+          objectLabel,
+          `Signed by: ${fld.driverName.value.trim() || 'Unknown'}`,
+          new Date().toLocaleString('en-US')
+        ];
+        const headerHeight = padding + (textLines.length * lineHeight) + padding;
+
+        const enhCanvas = document.createElement('canvas');
+        enhCanvas.width = origW;
+        enhCanvas.height = origH + headerHeight;
+        const ctx = enhCanvas.getContext('2d');
+
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, enhCanvas.width, enhCanvas.height);
+
+        // Header text
+        ctx.fillStyle = '#000000';
+        ctx.font = '12px Arial';
+        textLines.forEach((line, i) => {
+          ctx.fillText(line, padding, padding + (i + 1) * lineHeight);
+        });
+
+        // Draw original signature below header
+        ctx.drawImage(sigCanvas, 0, 0, sigCanvas.width, sigCanvas.height,
+                       0, headerHeight, origW, origH);
+
+        const dataURL = enhCanvas.toDataURL('image/png');
+        const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
+        resolve({ dataURL, base64Data });
+      });
+    }
+
+    // Upload signature for all ASNs and POs from AppointmentContents
+    async function uploadSignaturesForAppointment(appt, org) {
+      const contents = appt.AppointmentContents;
+      if (!contents || !Array.isArray(contents) || contents.length === 0) {
+        console.log('[SIGNATURE] No AppointmentContents to upload against');
+        return;
+      }
+
+      const appointmentId = appt.AppointmentId || 'Unknown';
+      const driverName = fld.driverName.value.trim() || 'Unknown';
+      const timestamp = new Date().toLocaleString('en-US');
+      const notes = `${timestamp}, ${driverName}`;
+
+      // Collect unique ASNs and POs
+      const uploads = [];
+      const seenIds = new Set();
+
+      contents.forEach(item => {
+        const asnObj = item.AsnId;
+        if (asnObj) {
+          const asnId = typeof asnObj === 'string' ? asnObj : (asnObj.AsnId || null);
+          if (asnId && !seenIds.has('ASN:' + asnId)) {
+            seenIds.add('ASN:' + asnId);
+            uploads.push({ objectTypeId: 'ASN', objectId: asnId, label: `ASN: ${asnId}` });
+          }
+        }
+        const poObj = item.PurchaseOrderId;
+        if (poObj) {
+          const poId = typeof poObj === 'string' ? poObj : (poObj.PurchaseOrderId || null);
+          if (poId && !seenIds.has('PO:' + poId)) {
+            seenIds.add('PO:' + poId);
+            uploads.push({ objectTypeId: 'PurchaseOrder', objectId: poId, label: `PO: ${poId}` });
+          }
+        }
+      });
+
+      if (uploads.length === 0) {
+        console.log('[SIGNATURE] No ASNs or POs found in AppointmentContents');
+        return;
+      }
+
+      console.log(`[SIGNATURE] Uploading signature for ${uploads.length} object(s)`);
+
+      for (const upload of uploads) {
+        try {
+          // Enhance signature with watermark specific to this object
+          const { base64Data } = await enhanceSignatureImage(appointmentId, upload.label);
+          const filename = `Signature_${appointmentId}_${upload.objectId}.png`;
+
+          const res = await api('upload_signature', {
+            org,
+            token,
+            objectTypeId: upload.objectTypeId,
+            objectId: upload.objectId,
+            filename,
+            fileData: base64Data,
+            notes
+          });
+
+          if (res.success) {
+            console.log(`[SIGNATURE] Uploaded for ${upload.objectTypeId}: ${upload.objectId}`);
+          } else {
+            console.warn(`[SIGNATURE] Failed for ${upload.objectTypeId}: ${upload.objectId}:`, res.error);
+          }
+        } catch (err) {
+          console.warn(`[SIGNATURE] Error uploading for ${upload.objectTypeId}: ${upload.objectId}:`, err);
+        }
+      }
+    }
+
     // ===== SIGNATURE PAD =====
     const sigCanvas = document.getElementById('signaturePad');
     const sigCtx = sigCanvas.getContext('2d');
