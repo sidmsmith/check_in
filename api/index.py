@@ -177,7 +177,7 @@ def ha_track():
         payload = {
             "event_name": event_name,
             "app_name": "check-in",
-            "app_version": "0.1.0",
+            "app_version": "0.1.1",
             **metadata,
             "timestamp": datetime.now().isoformat()
         }
