@@ -53,7 +53,7 @@
     }
 
     @media (min-width: 769px) {
-      .main-card { max-width: 1200px; margin: 2rem auto; }
+      .main-card { margin: 1rem; }
     }
 
     .form-control, .form-select {
@@ -94,7 +94,7 @@
     #apptForm { display: none; margin-top: 0.5rem; }
     .appt-form-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 0.75rem 1.25rem;
     }
     .appt-form-grid .form-group label {
@@ -152,6 +152,12 @@
       margin-top: 1.25rem;
       padding-top: 1rem;
       border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 1024px) {
+      .appt-form-grid {
+        grid-template-columns: 1fr 1fr;
+      }
     }
 
     @media (max-width: 768px) {
@@ -991,10 +997,14 @@
       fld.driverLicense.value = '';
       fld.tractorPlate.value = '';
 
-      // Clear signature pad
-      clearSignaturePad();
-
       apptForm.style.display = 'block';
+
+      // Initialize signature pad now that form is visible
+      requestAnimationFrame(() => {
+        resizeSignatureCanvas();
+        clearSignaturePad();
+      });
+
       checkinBtn.disabled = (appt.AppointmentStatusId !== '3000');
     }
 
@@ -1182,11 +1192,10 @@
 
     function resizeSignatureCanvas() {
       const wrapper = sigCanvas.parentElement;
-      const ratio = window.devicePixelRatio || 1;
       const w = wrapper.offsetWidth;
+      if (w === 0) return; // Skip if form is hidden
+      const ratio = window.devicePixelRatio || 1;
       const h = 180;
-      // Save current image data
-      const imgData = sigCanvas.width > 0 ? sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height) : null;
       sigCanvas.width = w * ratio;
       sigCanvas.height = h * ratio;
       sigCanvas.style.height = h + 'px';
