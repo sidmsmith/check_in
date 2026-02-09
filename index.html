@@ -387,7 +387,7 @@
           <div class="form-group bottom-field">
             <label>Trailer Condition Code</label>
             <select id="fld_conditionCode" class="form-select">
-              <option value="">—</option>
+              <option value=""></option>
             </select>
           </div>
           <div class="form-group bottom-check">
@@ -1060,7 +1060,7 @@
       if (condRes.success && condRes.codes) {
         conditionCodes = condRes.codes.sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
         const select = document.getElementById('fld_conditionCode');
-        select.innerHTML = '<option value="">—</option>';
+        select.innerHTML = '<option value=""></option>';
         conditionCodes.forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.ConditionCodeId;
