@@ -272,6 +272,43 @@ def search():
         "results": results
     })
 
+@app.route('/api/condition_codes', methods=['POST'])
+def condition_codes():
+    """Fetch trailer condition codes"""
+    org = request.json.get('org')
+    token = request.json.get('token')
+    if not all([org, token]):
+        return jsonify({"success": False, "error": "Missing data"})
+
+    url = f"https://{API_HOST}/yard-management/api/yard-management/trailerConditionCode/search"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "selectedOrganization": org,
+        "selectedLocation": f"{org}-DM1"
+    }
+    payload = {
+        "Query": "",
+        "Size": 9999,
+        "needTotalCount": True,
+        "Template": {
+            "ConditionCodeId": None,
+            "Description": None,
+            "RemoveCurrentLocation": None
+        }
+    }
+    try:
+        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        if r.ok:
+            data = r.json().get("data", {})
+            codes = data.get("TrailerConditionCode", [])
+            return jsonify({"success": True, "codes": codes})
+        else:
+            return jsonify({"success": False, "error": "Failed to fetch condition codes"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route('/api/checkin', methods=['POST'])
 def checkin():
     appt = request.json.get('appt')

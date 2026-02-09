@@ -116,6 +116,45 @@
     .required-asterisk { color: #dc3545; margin-left: 2px; }
     .btn-success:disabled { background: #888; opacity: 0.7; cursor: not-allowed; }
 
+    /* GREEN TOGGLE CHECKBOX */
+    .toggle-check {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      user-select: none;
+      padding: 0.45rem 0;
+    }
+    .toggle-check .check-box {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--input-border);
+      border-radius: 4px;
+      background: var(--input-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .toggle-check .check-box .check-icon {
+      display: none;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .toggle-check.checked .check-box {
+      background: var(--success);
+      border-color: var(--success);
+    }
+    .toggle-check.checked .check-box .check-icon {
+      display: block;
+    }
+    .toggle-check .check-label {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
     /* SIGNATURE PAD */
     .signature-section {
       margin-top: 0.75rem;
@@ -305,6 +344,33 @@
             <label>Trailer Contents</label>
             <input type="text" id="fld_trailerContents" class="form-control" readonly />
           </div>
+          <div class="form-group">
+            <label>Trailer Condition Code</label>
+            <select id="fld_conditionCode" class="form-select">
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <div class="toggle-check" id="chk_secondStop">
+              <div class="check-box"><span class="check-icon">&#10003;</span></div>
+              <span class="check-label">Do you have 2nd Stop?</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <div class="toggle-check" id="chk_workIn">
+              <div class="check-box"><span class="check-icon">&#10003;</span></div>
+              <span class="check-label">Work-In</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <div class="toggle-check" id="chk_dropHook">
+              <div class="check-box"><span class="check-icon">&#10003;</span></div>
+              <span class="check-label">Drop and Hook?</span>
+            </div>
+          </div>
         </div>
 
         <!-- Signature Pad -->
@@ -392,6 +458,7 @@
     let currentAppt = null; // Full appointment data from API
     let validAppointmentIds = new Set(); // Cached from /api/scheduled after auth
     let hasSigned = false; // Track whether signature pad has been drawn on
+    let conditionCodes = []; // Cached trailer condition codes
 
     // THEME DEFINITIONS
     const themes = {
@@ -931,8 +998,12 @@
       
       mainUI.style.display = 'block';
       
-      // Fetch all scheduled appointments to build valid ID list
-      const scheduledRes = await api('scheduled', { org, token });
+      // Fetch scheduled appointments and condition codes in parallel
+      const [scheduledRes, condRes] = await Promise.all([
+        api('scheduled', { org, token }),
+        api('condition_codes', { org, token })
+      ]);
+
       if (scheduledRes.success && scheduledRes.appointments) {
         validAppointmentIds = new Set(
           scheduledRes.appointments.map(a => String(a.AppointmentId)).filter(Boolean)
@@ -941,6 +1012,19 @@
       } else {
         validAppointmentIds = new Set();
         status('Authenticated – could not load appointments', 'error');
+      }
+
+      // Populate condition code dropdown
+      if (condRes.success && condRes.codes) {
+        conditionCodes = condRes.codes.sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+        const select = document.getElementById('fld_conditionCode');
+        select.innerHTML = '<option value="">—</option>';
+        conditionCodes.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.ConditionCodeId;
+          opt.textContent = c.Description || c.ConditionCodeId;
+          select.appendChild(opt);
+        });
       }
       
       setTimeout(() => criteriaInput.focus(), 100);
@@ -967,6 +1051,11 @@
     fld.carrier.addEventListener('input', validateCheckIn);
     fld.trailer.addEventListener('input', validateCheckIn);
     fld.driverName.addEventListener('input', validateCheckIn);
+
+    // Toggle checkboxes
+    document.querySelectorAll('.toggle-check').forEach(el => {
+      el.addEventListener('click', () => el.classList.toggle('checked'));
+    });
 
     // Date formatting helpers
     function formatDateNice(dateStr) {
@@ -1041,6 +1130,8 @@
       fld.driverLicense.value = '';
       fld.tractorPlate.value = '';
       fld.trailerContents.value = formatTrailerContents(appt);
+      document.getElementById('fld_conditionCode').value = '';
+      document.querySelectorAll('.toggle-check').forEach(el => el.classList.remove('checked'));
 
       hasSigned = false;
       apptForm.style.display = 'block';
@@ -1057,6 +1148,8 @@
     // Reset form
     function resetForm() {
       Object.values(fld).forEach(input => { input.value = ''; });
+      document.getElementById('fld_conditionCode').value = '';
+      document.querySelectorAll('.toggle-check').forEach(el => el.classList.remove('checked'));
       hasSigned = false;
       clearSignaturePad();
       apptForm.style.display = 'none';
