@@ -303,6 +303,10 @@
             <label>Tractor License Plate</label>
             <input type="text" id="fld_tractorPlate" class="form-control" />
           </div>
+          <div class="form-group">
+            <label>Trailer Contents</label>
+            <input type="text" id="fld_trailerContents" class="form-control" readonly />
+          </div>
         </div>
 
         <!-- Signature Pad -->
@@ -382,7 +386,8 @@
       driverName: document.getElementById('fld_driverName'),
       driverPhone: document.getElementById('fld_driverPhone'),
       driverLicense: document.getElementById('fld_driverLicense'),
-      tractorPlate: document.getElementById('fld_tractorPlate')
+      tractorPlate: document.getElementById('fld_tractorPlate'),
+      trailerContents: document.getElementById('fld_trailerContents')
     };
 
     let token = null;
@@ -985,6 +990,43 @@
       return typeId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
+    // Format trailer contents from AppointmentContents
+    function formatTrailerContents(appt) {
+      const contents = appt.AppointmentContents;
+      if (!contents || !Array.isArray(contents) || contents.length === 0) return '';
+
+      const pos = new Set();
+      const asns = new Set();
+
+      contents.forEach(item => {
+        // Handle nested object format: { PurchaseOrderId: { PurchaseOrderId: "PO123" } }
+        const poObj = item.PurchaseOrderId;
+        if (poObj) {
+          const poId = typeof poObj === 'string' ? poObj : (poObj.PurchaseOrderId || null);
+          if (poId) pos.add(poId);
+        }
+        // Also check flat format: { BillOfLadingNumber: "...", PurchaseOrderNumber: "..." }
+        if (item.PurchaseOrderNumber) pos.add(item.PurchaseOrderNumber);
+
+        const asnObj = item.AsnId;
+        if (asnObj) {
+          const asnId = typeof asnObj === 'string' ? asnObj : (asnObj.AsnId || null);
+          if (asnId) asns.add(asnId);
+        }
+      });
+
+      const parts = [];
+      if (pos.size > 0) {
+        const label = pos.size === 1 ? 'PO' : 'POs';
+        parts.push(`${label}: ${[...pos].join(', ')}`);
+      }
+      if (asns.size > 0) {
+        const label = asns.size === 1 ? 'ASN' : 'ASNs';
+        parts.push(`${label}: ${[...asns].join(', ')}`);
+      }
+      return parts.join(',   ');
+    }
+
     // Populate the appointment detail form
     function populateForm(appt) {
       currentAppt = appt;
@@ -999,6 +1041,7 @@
       fld.driverPhone.value = '';
       fld.driverLicense.value = '';
       fld.tractorPlate.value = '';
+      fld.trailerContents.value = formatTrailerContents(appt);
 
       hasSigned = false;
       apptForm.style.display = 'block';
