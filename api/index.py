@@ -208,20 +208,31 @@ def scheduled():
         "selectedOrganization": org,
         "selectedLocation": f"{org}-DM1"
     }
-    payload = {
-        "Query": "AppointmentStatusId= 3000",
-        "Template": {
-            "AppointmentId": None,
-            "ArrivalDateTime": None
-        }
-    }
+    # Paginate through all results
+    all_appointments = []
+    page = 0
+    page_size = 1000
     try:
-        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
-        if r.ok:
+        while True:
+            payload = {
+                "Query": "AppointmentStatusId= 3000",
+                "Template": {
+                    "AppointmentId": None,
+                    "ArrivalDateTime": None
+                },
+                "Size": page_size,
+                "Page": page
+            }
+            r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+            if not r.ok:
+                return jsonify({"success": False, "error": "Failed to fetch scheduled appointments"})
             data = r.json().get("data", [])
-            return jsonify({"success": True, "appointments": data})
-        else:
-            return jsonify({"success": False, "error": "Failed to fetch scheduled appointments"})
+            all_appointments.extend(data)
+            # If fewer results than page size, we've got them all
+            if len(data) < page_size:
+                break
+            page += 1
+        return jsonify({"success": True, "appointments": all_appointments})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 

@@ -69,9 +69,11 @@
       color: var(--text);
     }
 
-    .btn-primary { background: var(--primary); border: none; }
+    .btn-primary { background: var(--primary); border: none; color: #fff; }
+    .btn-primary:disabled { background: #888; opacity: 0.7; cursor: not-allowed; }
+    .btn-primary:not(:disabled) { background: var(--success); }
+    .btn-primary:not(:disabled):hover { background: var(--success-hover); }
     .btn-success { background: var(--success); border: none; }
-    .btn-primary:hover { background: var(--primary-hover); }
     .btn-success:hover { background: var(--success-hover); }
 
     /* STATUS BAR */
@@ -895,7 +897,7 @@
       const scheduledRes = await api('scheduled', { org, token });
       if (scheduledRes.success && scheduledRes.appointments) {
         validAppointmentIds = new Set(
-          scheduledRes.appointments.map(a => a.AppointmentId).filter(Boolean)
+          scheduledRes.appointments.map(a => String(a.AppointmentId)).filter(Boolean)
         );
         status(`Ready – ${validAppointmentIds.size} scheduled appointments available`, 'success');
       } else {
@@ -1157,7 +1159,7 @@
         const refreshOrg = orgInput.value.trim();
         api('scheduled', { org: refreshOrg, token }).then(r => {
           if (r.success && r.appointments) {
-            validAppointmentIds = new Set(r.appointments.map(a => a.AppointmentId).filter(Boolean));
+            validAppointmentIds = new Set(r.appointments.map(a => String(a.AppointmentId)).filter(Boolean));
           }
         });
       } else {
