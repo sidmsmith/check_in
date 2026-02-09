@@ -304,14 +304,19 @@ def condition_codes():
         }
     }
     try:
+        print(f"[ConditionCodes] POST {url}")
+        print(f"[ConditionCodes] Payload: {payload}")
         r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        print(f"[ConditionCodes] Status: {r.status_code}")
+        print(f"[ConditionCodes] Response: {r.text[:2000]}")
         if r.ok:
             data = r.json().get("data", {})
             codes = data.get("TrailerConditionCode", [])
             return jsonify({"success": True, "codes": codes})
         else:
-            return jsonify({"success": False, "error": "Failed to fetch condition codes"})
+            return jsonify({"success": False, "error": f"HTTP {r.status_code}: {r.text[:500]}"})
     except Exception as e:
+        print(f"[ConditionCodes] Exception: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 

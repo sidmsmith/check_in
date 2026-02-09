@@ -1015,7 +1015,9 @@
       }
 
       // Populate condition code dropdown
+      console.log('[ConditionCodes] API response:', JSON.stringify(condRes, null, 2));
       if (condRes.success && condRes.codes) {
+        console.log(`[ConditionCodes] Received ${condRes.codes.length} codes`);
         conditionCodes = condRes.codes.sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
         const select = document.getElementById('fld_conditionCode');
         select.innerHTML = '<option value="">—</option>';
@@ -1025,6 +1027,9 @@
           opt.textContent = c.Description || c.ConditionCodeId;
           select.appendChild(opt);
         });
+        console.log(`[ConditionCodes] Dropdown populated with ${conditionCodes.length} options`);
+      } else {
+        console.warn('[ConditionCodes] Failed to load:', condRes.error || 'No codes in response');
       }
       
       setTimeout(() => criteriaInput.focus(), 100);
