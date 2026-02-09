@@ -1122,14 +1122,15 @@
     function formatDateNice(dateStr) {
       if (!dateStr) return '';
       try {
-        // Ensure the date string is treated as UTC so toLocale* converts to user's timezone
+        // Manhattan API returns UTC without Z suffix — append Z so JS treats it as UTC
         let normalized = dateStr;
-        if (!normalized.endsWith('Z') && !normalized.includes('+') && !/\d{2}:\d{2}$/.test(normalized.slice(-6))) {
+        if (!normalized.endsWith('Z') && !normalized.includes('+')) {
           normalized += 'Z';
         }
         const dt = new Date(normalized);
-        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }) +
-               ' at ' + dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: tz }) +
+               ' at ' + dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz });
       } catch { return ''; }
     }
 
