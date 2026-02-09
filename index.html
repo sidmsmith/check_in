@@ -225,7 +225,7 @@
     </div>
 
     <!-- ORG -->
-    <div class="mb-3">
+    <div class="mb-3" id="orgSection">
       <label class="form-label">ORG:</label>
       <input type="text" id="org" class="form-control" placeholder="Enter ORG" maxlength="20" />
       <small>Press Enter to authenticate</small>
@@ -607,14 +607,31 @@
     };
 
     // Load theme on page load
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
+      // Check URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      
+      // Hide theme gear icon if theme=N
+      const themeParam = urlParams.get('theme');
+      if (themeParam && themeParam.toUpperCase() === 'N') {
+        themeSelectorBtn.style.display = 'none';
+      }
+      
       loadTheme();
       
       // Track app opened with full metadata
       trackEvent('app_opened', {});
       
       api('app_opened', {});
-      orgInput.focus();
+      
+      // Auto-authenticate if org or organization URL parameter is present
+      const autoOrg = urlParams.get('org') || urlParams.get('organization');
+      if (autoOrg) {
+        orgInput.value = autoOrg;
+        await authenticate(autoOrg.trim());
+      } else {
+        orgInput.focus();
+      }
     });
 
     // DROPDOWN CONFIG
@@ -842,10 +859,8 @@
       }
     }
 
-    // Auth
-    orgInput.addEventListener('keypress', async e => {
-      if (e.key !== 'Enter') return;
-      const org = orgInput.value.trim();
+    // Auth function (reusable for manual and auto-auth)
+    async function authenticate(org) {
       if (!org) return status('ORG required', 'error');
       
       // Increment auth attempt count
@@ -891,6 +906,9 @@
       // Reset for next session (if they log out and back in)
       firstAuthSuccess = false;
       
+      // Hide ORG section after successful auth
+      document.getElementById('orgSection').style.display = 'none';
+      
       mainUI.style.display = 'block';
       
       // Fetch all scheduled appointments to build valid ID list
@@ -906,6 +924,12 @@
       }
       
       setTimeout(() => criteriaInput.focus(), 100);
+    }
+
+    // Auth on Enter key
+    orgInput.addEventListener('keypress', async e => {
+      if (e.key !== 'Enter') return;
+      await authenticate(orgInput.value.trim());
     });
 
     // Real-time validation: enable Find button only when input matches a valid AppointmentId
