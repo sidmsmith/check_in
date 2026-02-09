@@ -304,11 +304,7 @@ def condition_codes():
         }
     }
     try:
-        print(f"[ConditionCodes] POST {url}")
-        print(f"[ConditionCodes] Payload: {payload}")
         r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
-        print(f"[ConditionCodes] Status: {r.status_code}")
-        print(f"[ConditionCodes] Response: {r.text[:2000]}")
         if r.ok:
             body = r.json()
             data = body.get("data", {})
@@ -319,12 +315,61 @@ def condition_codes():
                 codes = data
             else:
                 codes = []
-            print(f"[ConditionCodes] Parsed {len(codes)} codes")
             return jsonify({"success": True, "codes": codes})
         else:
             return jsonify({"success": False, "error": f"HTTP {r.status_code}: {r.text[:500]}"})
     except Exception as e:
         print(f"[ConditionCodes] Exception: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route('/api/equipment_types', methods=['POST'])
+def equipment_types():
+    """Fetch trailer equipment types"""
+    org = request.json.get('org')
+    token = request.json.get('token')
+    if not all([org, token]):
+        return jsonify({"success": False, "error": "Missing data"})
+
+    url = f"https://{API_HOST}/yard-management/api/yard-management/equipmentType/search"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "selectedOrganization": org,
+        "selectedLocation": f"{org}-DM1"
+    }
+    payload = {
+        "Query": "StandardEquipmentTypeId=TRAILER",
+        "Size": 9999,
+        "needTotalCount": True,
+        "Template": {
+            "EquipmentTypeId": None,
+            "Description": None
+        }
+    }
+    try:
+        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        if r.ok:
+            body = r.json()
+            data = body.get("data", {})
+            # data may be a list directly or a dict
+            if isinstance(data, dict):
+                types = data.get("EquipmentType", []) or data.get("equipmentType", [])
+                if not types:
+                    # Try all values in case key name varies
+                    for v in data.values():
+                        if isinstance(v, list):
+                            types = v
+                            break
+            elif isinstance(data, list):
+                types = data
+            else:
+                types = []
+            return jsonify({"success": True, "types": types})
+        else:
+            return jsonify({"success": False, "error": f"HTTP {r.status_code}: {r.text[:500]}"})
+    except Exception as e:
+        print(f"[EquipmentTypes] Exception: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 

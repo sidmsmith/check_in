@@ -155,6 +155,25 @@
       color: var(--text);
     }
 
+    /* BOTTOM ROW (condition code + checkboxes) */
+    .appt-bottom-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+      align-items: flex-end;
+    }
+    .appt-bottom-row .form-group {
+      flex: 1;
+      min-width: 0;
+    }
+    .appt-bottom-row .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 0.25rem;
+    }
+
     /* SIGNATURE PAD */
     .signature-section {
       margin-top: 0.75rem;
@@ -204,6 +223,10 @@
       }
       .appt-form-grid {
         grid-template-columns: 1fr;
+      }
+      .appt-bottom-row {
+        flex-direction: column;
+        gap: 0.5rem;
       }
     }
 
@@ -321,6 +344,12 @@
             <input type="text" id="fld_trailer" class="form-control" />
           </div>
           <div class="form-group">
+            <label>Trailer Type</label>
+            <select id="fld_trailerType" class="form-select">
+              <option value="53FT">53FT</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Driver Name<span class="required-asterisk">*</span></label>
             <input type="text" id="fld_driverName" class="form-control" />
           </div>
@@ -344,6 +373,9 @@
             <label>Trailer Contents</label>
             <input type="text" id="fld_trailerContents" class="form-control" readonly />
           </div>
+        </div>
+        <!-- Bottom row: 5 items -->
+        <div class="appt-bottom-row">
           <div class="form-group">
             <label>Trailer Condition Code</label>
             <select id="fld_conditionCode" class="form-select">
@@ -354,7 +386,7 @@
             <label>&nbsp;</label>
             <div class="toggle-check" id="chk_secondStop">
               <div class="check-box"><span class="check-icon">&#10003;</span></div>
-              <span class="check-label">Do you have 2nd Stop?</span>
+              <span class="check-label">2nd Stop?</span>
             </div>
           </div>
           <div class="form-group">
@@ -459,6 +491,7 @@
     let validAppointmentIds = new Set(); // Cached from /api/scheduled after auth
     let hasSigned = false; // Track whether signature pad has been drawn on
     let conditionCodes = []; // Cached trailer condition codes
+    let equipmentTypes = []; // Cached trailer equipment types
 
     // THEME DEFINITIONS
     const themes = {
@@ -1000,10 +1033,11 @@
       
       mainUI.style.display = 'block';
       
-      // Fetch scheduled appointments and condition codes in parallel
-      const [scheduledRes, condRes] = await Promise.all([
+      // Fetch scheduled appointments, condition codes, and equipment types in parallel
+      const [scheduledRes, condRes, equipRes] = await Promise.all([
         api('scheduled', { org, token }),
-        api('condition_codes', { org, token })
+        api('condition_codes', { org, token }),
+        api('equipment_types', { org, token })
       ]);
 
       if (scheduledRes.success && scheduledRes.appointments) {
@@ -1013,13 +1047,12 @@
         status(`Ready – ${validAppointmentIds.size} scheduled appointments available`, 'success');
       } else {
         validAppointmentIds = new Set();
+        console.error('[Scheduled] Failed to load appointments:', scheduledRes.error || 'Unknown error');
         status('Authenticated – could not load appointments', 'error');
       }
 
       // Populate condition code dropdown
-      console.log('[ConditionCodes] API response:', JSON.stringify(condRes, null, 2));
       if (condRes.success && condRes.codes) {
-        console.log(`[ConditionCodes] Received ${condRes.codes.length} codes`);
         conditionCodes = condRes.codes.sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
         const select = document.getElementById('fld_conditionCode');
         select.innerHTML = '<option value="">—</option>';
@@ -1029,9 +1062,25 @@
           opt.textContent = c.Description || c.ConditionCodeId;
           select.appendChild(opt);
         });
-        console.log(`[ConditionCodes] Dropdown populated with ${conditionCodes.length} options`);
       } else {
-        console.warn('[ConditionCodes] Failed to load:', condRes.error || 'No codes in response');
+        console.error('[ConditionCodes] Failed to load:', condRes.error || 'Unknown error');
+      }
+
+      // Populate equipment type dropdown
+      if (equipRes.success && equipRes.types) {
+        equipmentTypes = equipRes.types.sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+        const select = document.getElementById('fld_trailerType');
+        select.innerHTML = '';
+        equipmentTypes.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.EquipmentTypeId;
+          opt.textContent = t.Description || t.EquipmentTypeId;
+          select.appendChild(opt);
+        });
+        // Default to 53FT
+        select.value = '53FT';
+      } else {
+        console.error('[EquipmentTypes] Failed to load:', equipRes.error || 'Unknown error');
       }
       
       setTimeout(() => criteriaInput.focus(), 100);
@@ -1137,6 +1186,14 @@
       fld.driverLicense.value = '';
       fld.tractorPlate.value = '';
       fld.trailerContents.value = formatTrailerContents(appt);
+      // Set Trailer Type: use appointment value if present, otherwise default to 53FT
+      const trailerTypeSelect = document.getElementById('fld_trailerType');
+      const apptEquipType = appt.EquipmentTypeId || '';
+      if (apptEquipType && [...trailerTypeSelect.options].some(o => o.value === apptEquipType)) {
+        trailerTypeSelect.value = apptEquipType;
+      } else {
+        trailerTypeSelect.value = '53FT';
+      }
       document.getElementById('fld_conditionCode').value = '';
       document.querySelectorAll('.toggle-check').forEach(el => el.classList.remove('checked'));
 
@@ -1155,6 +1212,7 @@
     // Reset form
     function resetForm() {
       Object.values(fld).forEach(input => { input.value = ''; });
+      document.getElementById('fld_trailerType').value = '53FT';
       document.getElementById('fld_conditionCode').value = '';
       document.querySelectorAll('.toggle-check').forEach(el => el.classList.remove('checked'));
       hasSigned = false;
@@ -1227,12 +1285,14 @@
 
       // Build merged appointment from API data + form edits
       const conditionCode = document.getElementById('fld_conditionCode').value || null;
+      const equipmentTypeId = document.getElementById('fld_trailerType').value || currentAppt.EquipmentTypeId;
       const appt = {
         ...currentAppt,
         CarrierId: fld.carrier.value.trim() || currentAppt.CarrierId,
         TrailerId: fld.trailer.value.trim() || currentAppt.TrailerId,
         TractorId: fld.truckNumber.value.trim() || currentAppt.TractorId,
         DriverId: fld.driverName.value.trim() || currentAppt.DriverId,
+        EquipmentTypeId: equipmentTypeId,
         ConditionCodeId: conditionCode
       };
 
