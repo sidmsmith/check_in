@@ -1248,47 +1248,69 @@
     }
     // ===== SIGNATURE ENHANCEMENT & UPLOAD =====
 
-    // Enhance signature image with watermark (AppointmentId + object label)
+    // Enhance signature image with Manhattan logo watermark + metadata
     function enhanceSignatureImage(appointmentId, objectLabel) {
       return new Promise((resolve) => {
-        const ratio = window.devicePixelRatio || 1;
-        const origW = sigCanvas.width / ratio;
-        const origH = sigCanvas.height / ratio;
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        logo.onload = () => buildEnhancedImage(logo);
+        logo.onerror = () => buildEnhancedImage(null); // Fallback without logo
+        logo.src = '/manhattan-logo.png';
 
-        // Header layout
-        const padding = 10;
-        const lineHeight = 18;
-        const textLines = [
-          `Appointment: ${appointmentId}`,
-          objectLabel,
-          `Signed by: ${fld.driverName.value.trim() || 'Unknown'}`,
-          new Date().toLocaleString('en-US')
-        ];
-        const headerHeight = padding + (textLines.length * lineHeight) + padding;
+        function buildEnhancedImage(logoImg) {
+          const ratio = window.devicePixelRatio || 1;
+          const origW = sigCanvas.width / ratio;
+          const origH = sigCanvas.height / ratio;
 
-        const enhCanvas = document.createElement('canvas');
-        enhCanvas.width = origW;
-        enhCanvas.height = origH + headerHeight;
-        const ctx = enhCanvas.getContext('2d');
+          const padding = 10;
+          const lineHeight = 18;
+          const textLines = [
+            `Appointment: ${appointmentId}`,
+            objectLabel,
+            `Signed by: ${fld.driverName.value.trim() || 'Unknown'}`,
+            new Date().toLocaleString('en-US')
+          ];
 
-        // White background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, enhCanvas.width, enhCanvas.height);
+          // Calculate logo dimensions
+          let logoW = 0, logoH = 0, textSpacing = 0;
+          if (logoImg) {
+            logoW = 120;
+            logoH = (logoImg.height / logoImg.width) * logoW;
+            textSpacing = 10;
+          }
 
-        // Header text
-        ctx.fillStyle = '#000000';
-        ctx.font = '12px Arial';
-        textLines.forEach((line, i) => {
-          ctx.fillText(line, padding, padding + (i + 1) * lineHeight);
-        });
+          const headerHeight = padding + logoH + textSpacing + (textLines.length * lineHeight) + padding;
 
-        // Draw original signature below header
-        ctx.drawImage(sigCanvas, 0, 0, sigCanvas.width, sigCanvas.height,
-                       0, headerHeight, origW, origH);
+          const enhCanvas = document.createElement('canvas');
+          enhCanvas.width = origW;
+          enhCanvas.height = origH + headerHeight;
+          const ctx = enhCanvas.getContext('2d');
 
-        const dataURL = enhCanvas.toDataURL('image/png');
-        const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
-        resolve({ dataURL, base64Data });
+          // White background
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, enhCanvas.width, enhCanvas.height);
+
+          // Draw logo
+          if (logoImg) {
+            ctx.drawImage(logoImg, padding, padding, logoW, logoH);
+          }
+
+          // Header text below logo
+          ctx.fillStyle = '#000000';
+          ctx.font = '12px Arial';
+          const textStartY = padding + logoH + textSpacing;
+          textLines.forEach((line, i) => {
+            ctx.fillText(line, padding, textStartY + (i + 1) * lineHeight);
+          });
+
+          // Draw original signature below header
+          ctx.drawImage(sigCanvas, 0, 0, sigCanvas.width, sigCanvas.height,
+                         0, headerHeight, origW, origH);
+
+          const dataURL = enhCanvas.toDataURL('image/png');
+          const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
+          resolve({ dataURL, base64Data });
+        }
       });
     }
 
