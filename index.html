@@ -728,8 +728,10 @@
       
       api('app_opened', {});
       
-      // Auto-authenticate if org or organization URL parameter is present
-      const autoOrg = urlParams.get('org') || urlParams.get('organization');
+      // Auto-authenticate if org or organization URL parameter is present (case-insensitive)
+      const ciParams = {};
+      for (const [key, value] of urlParams.entries()) { ciParams[key.toLowerCase()] = value; }
+      const autoOrg = ciParams['org'] || ciParams['organization'];
       if (autoOrg) {
         orgInput.value = autoOrg;
         await authenticate(autoOrg.trim());

@@ -310,8 +310,16 @@ def condition_codes():
         print(f"[ConditionCodes] Status: {r.status_code}")
         print(f"[ConditionCodes] Response: {r.text[:2000]}")
         if r.ok:
-            data = r.json().get("data", {})
-            codes = data.get("TrailerConditionCode", [])
+            body = r.json()
+            data = body.get("data", {})
+            # data may be a dict with "TrailerConditionCode" key, or a list directly
+            if isinstance(data, dict):
+                codes = data.get("TrailerConditionCode", [])
+            elif isinstance(data, list):
+                codes = data
+            else:
+                codes = []
+            print(f"[ConditionCodes] Parsed {len(codes)} codes")
             return jsonify({"success": True, "codes": codes})
         else:
             return jsonify({"success": False, "error": f"HTTP {r.status_code}: {r.text[:500]}"})
