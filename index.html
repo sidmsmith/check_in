@@ -282,16 +282,16 @@
             <input type="text" id="fld_trailer" class="form-control" />
           </div>
           <div class="form-group">
-            <label>Truck Number</label>
-            <input type="text" id="fld_truckNumber" class="form-control" />
-          </div>
-          <div class="form-group">
-            <label>Driver Name</label>
+            <label>Driver Name<span class="required-asterisk">*</span></label>
             <input type="text" id="fld_driverName" class="form-control" />
           </div>
           <div class="form-group">
             <label>Driver Phone Number</label>
             <input type="text" id="fld_driverPhone" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Truck Number</label>
+            <input type="text" id="fld_truckNumber" class="form-control" />
           </div>
           <div class="form-group">
             <label>Driver's License Number</label>
@@ -966,6 +966,7 @@
     // Validate Check In when required fields change
     fld.carrier.addEventListener('input', validateCheckIn);
     fld.trailer.addEventListener('input', validateCheckIn);
+    fld.driverName.addEventListener('input', validateCheckIn);
 
     // Date formatting helpers
     function formatDateNice(dateStr) {
@@ -1071,7 +1072,8 @@
       }
       const carrierOk = fld.carrier.value.trim().length > 0;
       const trailerOk = fld.trailer.value.trim().length > 0;
-      checkinBtn.disabled = !(carrierOk && trailerOk && hasSigned);
+      const driverOk = fld.driverName.value.trim().length > 0;
+      checkinBtn.disabled = !(carrierOk && trailerOk && driverOk && hasSigned);
     }
 
     // Find
