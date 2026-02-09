@@ -60,29 +60,6 @@ def get_manhattan_token(org):
     except:
         return None
 
-def search_single(criteria, headers, org):
-    url = f"https://{API_HOST}/appointment/api/appointment/appointment/search"
-    headers = headers.copy()
-    headers.update({
-        "Content-Type": "application/json",
-        "selectedOrganization": org,
-        "selectedLocation": f"{org}-DM1"
-    })
-    value = criteria.strip().strip("'\"")
-    if not value:
-        return []
-    query = f"(AppointmentId = '{value}' OR CarrierId = '{value}' OR TrailerId = '{value}' OR AppointmentContents.BillOfLadingNumber = '{value}')"
-    payload = {
-        "Query": query,
-        "Size": 1000,
-        "Page": 0
-    }
-    try:
-        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
-        return r.json().get("data", []) if r.ok else []
-    except:
-        return []
-
 def check_in_trailer(appt_data, headers, org):
     url = f"https://{API_HOST}/yard-management/api/yard-management/transaction/trailer/checkIn"
     headers = headers.copy()
@@ -216,42 +193,72 @@ def auth():
         return jsonify({"success": True, "token": token})
     return jsonify({"success": False, "error": "Auth failed"})
 
-@app.route('/api/search', methods=['POST'])
-def search():
+@app.route('/api/scheduled', methods=['POST'])
+def scheduled():
+    """Fetch all scheduled (non-checked-in) appointments"""
     org = request.json.get('org')
-    criteria_input = request.json.get('criteria', '')
     token = request.json.get('token')
-    if not all([org, criteria_input, token]):
+    if not all([org, token]):
         return jsonify({"success": False, "error": "Missing data"})
 
-    headers = {"Authorization": f"Bearer {token}"}
-    raw_values = re.split(r'[,\s;]+', criteria_input)
-    criteria_list = [v.strip().strip("'\"") for v in raw_values if v.strip() and v.strip("'\"")]
-    if not criteria_list:
-        return jsonify({"success": False, "error": "No valid criteria"})
+    url = f"https://{API_HOST}/appointment/api/appointment/appointment/search"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "selectedOrganization": org,
+        "selectedLocation": f"{org}-DM1"
+    }
+    payload = {
+        "Query": "AppointmentStatusId= 3000",
+        "Template": {
+            "AppointmentId": None,
+            "ArrivalDateTime": None
+        }
+    }
+    try:
+        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        if r.ok:
+            data = r.json().get("data", [])
+            return jsonify({"success": True, "appointments": data})
+        else:
+            return jsonify({"success": False, "error": "Failed to fetch scheduled appointments"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
-    per_criteria = {}
-    all_appts = {}
-    seen_ids = set()
+@app.route('/api/search', methods=['POST'])
+def search():
+    """Search for a specific appointment by AppointmentId"""
+    org = request.json.get('org')
+    appointment_id = request.json.get('appointment_id', '').strip()
+    token = request.json.get('token')
+    if not all([org, appointment_id, token]):
+        return jsonify({"success": False, "error": "Missing data"})
 
-    for crit in criteria_list:
-        results = search_single(crit, headers, org)
-        per_criteria[crit] = len(results)
-        for appt in results:
-            appt_id = appt.get("AppointmentId")
-            if appt_id and appt_id not in seen_ids:
-                all_appts[appt_id] = appt
-                seen_ids.add(appt_id)
+    url = f"https://{API_HOST}/appointment/api/appointment/appointment/search"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "selectedOrganization": org,
+        "selectedLocation": f"{org}-DM1"
+    }
+    payload = {
+        "Query": f"AppointmentId = '{appointment_id}'",
+        "Size": 1,
+        "Page": 0
+    }
+    try:
+        r = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        results = r.json().get("data", []) if r.ok else []
+    except:
+        results = []
 
-    final_results = list(all_appts.values())
-    for appt in final_results:
+    for appt in results:
         appt['ScheduledDate'] = format_date(appt.get('PreferredDateTime'))
         appt['StatusText'] = format_status(appt.get('AppointmentStatusId'))
 
     return jsonify({
         "success": True,
-        "results": final_results,
-        "per_criteria": per_criteria
+        "results": results
     })
 
 @app.route('/api/checkin', methods=['POST'])

@@ -231,17 +231,17 @@
 
     <!-- MAIN UI (Hidden until auth) -->
     <div id="mainUI">
-      <!-- CRITERIA BELOW ORG -->
+      <!-- APPOINTMENT ID INPUT -->
       <div class="mb-3">
-        <label class="form-label">Appointment Criteria:</label>
-        <input type="text" id="criteria" class="form-control" placeholder="Appt ID, Carrier, Trailer, or BOL" />
-        <small>Search by Appointment ID, Carrier, Trailer, or BOL (space, comma, semicolon, or new line)</small>
+        <label class="form-label">Enter Appointment:</label>
+        <input type="text" id="criteria" class="form-control" placeholder="Enter Appointment ID" />
+        <small>Enter a valid Appointment ID to find the appointment</small>
       </div>
 
       <!-- STATUS + FIND BUTTON -->
       <div class="status-bar">
         <div class="status" id="status">Enter ORG and press Enter to authenticate</div>
-        <button id="findBtn" class="btn btn-primary px-4">Find Appointment</button>
+        <button id="findBtn" class="btn btn-primary px-4" disabled>Find Appointment</button>
       </div>
 
       <!-- SCROLLABLE TABLE -->
@@ -344,6 +344,7 @@
     let token = null;
     let selectedAppt = null;
     let pendingCheckIn = null;
+    let validAppointmentIds = new Set(); // Cached from /api/scheduled after auth
 
     // THEME DEFINITIONS
     const themes = {
@@ -874,7 +875,7 @@
       }
       
       token = res.token;
-      status('Authenticated – ready!', 'success');
+      status('Authenticated – loading appointments...', 'success');
       
       // Track auth success
       trackEvent('auth_success', {
@@ -889,50 +890,58 @@
       firstAuthSuccess = false;
       
       mainUI.style.display = 'block';
+      
+      // Fetch all scheduled appointments to build valid ID list
+      const scheduledRes = await api('scheduled', { org, token });
+      if (scheduledRes.success && scheduledRes.appointments) {
+        validAppointmentIds = new Set(
+          scheduledRes.appointments.map(a => a.AppointmentId).filter(Boolean)
+        );
+        status(`Ready – ${validAppointmentIds.size} scheduled appointments available`, 'success');
+      } else {
+        validAppointmentIds = new Set();
+        status('Authenticated – could not load appointments', 'error');
+      }
+      
       setTimeout(() => criteriaInput.focus(), 100);
     });
 
-    // Enter → Search
+    // Real-time validation: enable Find button only when input matches a valid AppointmentId
+    criteriaInput.addEventListener('input', () => {
+      const value = criteriaInput.value.trim();
+      findBtn.disabled = !value || !validAppointmentIds.has(value);
+    });
+
+    // Enter → Search (only if button is enabled)
     criteriaInput.addEventListener('keypress', e => {
-      if (e.key === 'Enter') findBtn.click();
+      if (e.key === 'Enter' && !findBtn.disabled) findBtn.click();
     });
 
     // Find
     findBtn.onclick = async () => {
-      const criteria = criteriaInput.value.trim();
-      if (!criteria) return status('Enter criteria', 'error');
+      const appointmentId = criteriaInput.value.trim();
+      if (!appointmentId) return status('Enter an Appointment ID', 'error');
       
       const org = orgInput.value.trim() || 'unknown';
-      
-      // Parse criteria list
-      const criteriaList = criteria.split(/[,\s;]+/).filter(c => c.trim()).map(c => c.trim().replace(/^["']|["']$/g, ''));
-      
       const searchStartTime = Date.now();
       
-      // Track search attempt with appointment-specific metadata
+      // Track search attempt
       trackEvent('search_attempt', {
         org: org,
-        criteria: criteria,
-        criteria_list: criteriaList.length > 0 ? criteriaList : null,
-        criteria_count: criteriaList.length,
-        criteria_length: String(criteria.length)
+        appointment_id: appointmentId
       });
       
-      status('Searching appointments...');
+      status('Finding appointment...');
       const apiStartTime = Date.now();
-      const res = await api('search', { org, criteria, token });
+      const res = await api('search', { org, appointment_id: appointmentId, token });
       const apiResponseTime = Date.now() - apiStartTime;
       const searchDuration = Date.now() - searchStartTime;
       
       if (!res.success) {
-        // Track search failure
         trackEvent('search_failed', {
           org: org,
-          criteria: criteria,
-          criteria_list: criteriaList.length > 0 ? criteriaList : null,
-          criteria_count: criteriaList.length,
+          appointment_id: appointmentId,
           error: res.error || 'Search failed',
-          error_message: res.error || 'Search failed',
           search_duration_ms: searchDuration,
           api_response_time_ms: apiResponseTime
         });
@@ -940,56 +949,17 @@
       }
       
       renderResults(res.results);
-      showDetailedCount(res.results.length, res.per_criteria);
+      status(`Found ${res.results.length} appointment${res.results.length !== 1 ? 's' : ''}`, 'success');
       
-      // Analyze results for metadata
-      const resultsByStatus = {};
-      const resultsByType = {};
-      let hasSchedulableAppointments = false;
-      
-      res.results.forEach(appt => {
-        const statusId = appt.AppointmentStatusId || 'unknown';
-        const typeId = appt.AppointmentTypeId || 'unknown';
-        
-        resultsByStatus[statusId] = (resultsByStatus[statusId] || 0) + 1;
-        resultsByType[typeId] = (resultsByType[typeId] || 0) + 1;
-        
-        if (statusId === '3000') {
-          hasSchedulableAppointments = true;
-        }
-      });
-      
-      // Track search success with appointment-specific metadata
+      // Track search success
       trackEvent('search_completed', {
         org: org,
-        criteria: criteria,
-        criteria_list: criteriaList.length > 0 ? criteriaList : null,
-        criteria_count: criteriaList.length,
+        appointment_id: appointmentId,
         results_count: res.results.length,
-        per_criteria: res.per_criteria || {},
-        results_by_status: Object.keys(resultsByStatus).length > 0 ? resultsByStatus : null,
-        results_by_type: Object.keys(resultsByType).length > 0 ? resultsByType : null,
-        has_schedulable_appointments: hasSchedulableAppointments,
         search_duration_ms: searchDuration,
         api_response_time_ms: apiResponseTime
       });
     };
-
-    // DETAILED COUNT
-    function showDetailedCount(total, perCriteria) {
-      if (!perCriteria || Object.keys(perCriteria).length === 0) {
-        status(`Found ${total} appointments`, 'success');
-        return;
-      }
-
-      const parts = Object.entries(perCriteria)
-        .filter(([crit, count]) => count > 0)
-        .sort((a, b) => b[1] - a[1])
-        .map(([crit, count]) => `${count} for ${crit}`)
-        .join(', ');
-
-      status(`Found ${total} appointments (${parts})`, 'success');
-    }
 
     // Render
     function renderResults(results) {
@@ -1173,7 +1143,23 @@
           checkin_payload_size: payloadSize
         });
         
-        findBtn.click();
+        // Remove checked-in appointment from valid set and refresh
+        validAppointmentIds.delete(appt.AppointmentId);
+        criteriaInput.value = '';
+        findBtn.disabled = true;
+        resultsBody.innerHTML = '';
+        selectedEl.textContent = 'None';
+        selectedAppt = null;
+        checkinBtn.disabled = true;
+        status(`Check-in complete – ${validAppointmentIds.size} scheduled appointments remaining`, 'success');
+        
+        // Refresh the valid appointments list in background
+        const refreshOrg = orgInput.value.trim();
+        api('scheduled', { org: refreshOrg, token }).then(r => {
+          if (r.success && r.appointments) {
+            validAppointmentIds = new Set(r.appointments.map(a => a.AppointmentId).filter(Boolean));
+          }
+        });
       } else {
         // Track check-in failure with appointment-specific metadata
         trackEvent('checkin_failed', {
