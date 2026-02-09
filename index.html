@@ -1219,12 +1219,14 @@
       if (!currentAppt) return;
 
       // Build merged appointment from API data + form edits
+      const conditionCode = document.getElementById('fld_conditionCode').value || null;
       const appt = {
         ...currentAppt,
         CarrierId: fld.carrier.value.trim() || currentAppt.CarrierId,
         TrailerId: fld.trailer.value.trim() || currentAppt.TrailerId,
         TractorId: fld.truckNumber.value.trim() || currentAppt.TractorId,
-        DriverId: fld.driverName.value.trim() || currentAppt.DriverId
+        DriverId: fld.driverName.value.trim() || currentAppt.DriverId,
+        ConditionCodeId: conditionCode
       };
 
       await performCheckIn(appt);

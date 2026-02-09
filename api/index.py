@@ -69,17 +69,23 @@ def check_in_trailer(appt_data, headers, org):
         "selectedLocation": f"{org}-DM1"
     })
     appt_type = appt_data.get("AppointmentTypeId", "")
+    trailer_info = {
+        "CarrierId": appt_data.get("CarrierId"),
+        "TrailerId": appt_data.get("TrailerId"),
+        "EquipmentTypeId": appt_data.get("EquipmentTypeId")
+    }
+    # Include ConditionCodeId if provided
+    condition_code = appt_data.get("ConditionCodeId")
+    if condition_code:
+        trailer_info["ConditionCodeId"] = condition_code
+
     payload = {
         "AppointmentInfo": {
             "AppointmentId": appt_data.get("AppointmentId"),
             "AppointmentTypeId": appt_type
         },
         "VisitType": appt_type,
-        "TrailerInfo": {
-            "CarrierId": appt_data.get("CarrierId"),
-            "TrailerId": appt_data.get("TrailerId"),
-            "EquipmentTypeId": appt_data.get("EquipmentTypeId")
-        }
+        "TrailerInfo": trailer_info
     }
     
     # TODO: Add validation for ASN and Shipment if specified on appointment
