@@ -722,7 +722,8 @@
           '--logo-url': 'url("/nissan_logo.png")',
           '--logo-display': 'block'
         },
-        logo: '/nissan_logo.png'
+        logo: '/nissan_logo.png',
+        logoMaxHeight: '100px'
       }
     };
 
@@ -740,8 +741,10 @@
       if (theme.logo) {
         themeLogo.src = theme.logo;
         themeLogo.style.display = 'block';
+        themeLogo.style.maxHeight = theme.logoMaxHeight || '50px';
       } else {
         themeLogo.style.display = 'none';
+        themeLogo.style.maxHeight = '50px';
       }
 
       // Save to localStorage
