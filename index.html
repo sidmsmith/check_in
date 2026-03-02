@@ -155,7 +155,14 @@
       color: var(--text);
     }
 
-    /* BOTTOM ROW (2 fields + 3 checkboxes) */
+    /* TRACTOR PLATE + CHECKBOXES STACKED */
+    .tractor-checks {
+      display: flex;
+      justify-content: space-evenly;
+      margin-top: 0.5rem;
+    }
+
+    /* BOTTOM ROW (3 fields) */
     .appt-bottom-row {
       display: flex;
       gap: 0.5rem 1rem;
@@ -164,15 +171,7 @@
     }
     .appt-bottom-row .form-group {
       min-width: 0;
-    }
-    .appt-bottom-row .form-group.bottom-field {
-      flex: 0 0 calc(25% - 0.75rem);
-    }
-    .appt-bottom-row .form-group.bottom-check {
       flex: 1;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
     }
     .appt-bottom-row .form-group label {
       display: block;
@@ -376,37 +375,33 @@
           <div class="form-group">
             <label>Tractor License Plate</label>
             <input type="text" id="fld_tractorPlate" class="form-control" />
+            <div class="tractor-checks">
+              <div class="toggle-check" id="chk_secondStop">
+                <div class="check-box"><span class="check-icon">&#10003;</span></div>
+                <span class="check-label">2nd Stop?</span>
+              </div>
+              <div class="toggle-check" id="chk_dropHook">
+                <div class="check-box"><span class="check-icon">&#10003;</span></div>
+                <span class="check-label">Drop and Hook?</span>
+              </div>
+            </div>
           </div>
         </div>
-        <!-- Bottom row: 5 items -->
+        <!-- Bottom row: 3 fields -->
         <div class="appt-bottom-row">
-          <div class="form-group bottom-field">
+          <div class="form-group">
             <label>Trailer Contents</label>
             <input type="text" id="fld_trailerContents" class="form-control" readonly />
           </div>
-          <div class="form-group bottom-field">
+          <div class="form-group">
             <label>Trailer Condition Code</label>
             <select id="fld_conditionCode" class="form-select">
               <option value=""></option>
             </select>
           </div>
-          <div class="form-group bottom-check">
-            <div class="toggle-check" id="chk_secondStop">
-              <div class="check-box"><span class="check-icon">&#10003;</span></div>
-              <span class="check-label">2nd Stop?</span>
-            </div>
-          </div>
-          <div class="form-group bottom-check">
-            <div class="toggle-check" id="chk_workIn">
-              <div class="check-box"><span class="check-icon">&#10003;</span></div>
-              <span class="check-label">Work-In</span>
-            </div>
-          </div>
-          <div class="form-group bottom-check">
-            <div class="toggle-check" id="chk_dropHook">
-              <div class="check-box"><span class="check-icon">&#10003;</span></div>
-              <span class="check-label">Drop and Hook?</span>
-            </div>
+          <div class="form-group">
+            <label>RFID Tag</label>
+            <input type="text" id="fld_rfidTag" class="form-control" />
           </div>
         </div>
 
@@ -488,7 +483,8 @@
       driverPhone: document.getElementById('fld_driverPhone'),
       driverLicense: document.getElementById('fld_driverLicense'),
       tractorPlate: document.getElementById('fld_tractorPlate'),
-      trailerContents: document.getElementById('fld_trailerContents')
+      trailerContents: document.getElementById('fld_trailerContents'),
+      rfidTag: document.getElementById('fld_rfidTag')
     };
 
     let token = null;
@@ -1227,6 +1223,7 @@
       fld.driverPhone.value = '';
       fld.driverLicense.value = '';
       fld.tractorPlate.value = '';
+      fld.rfidTag.value = '';
       fld.trailerContents.value = formatTrailerContents(appt);
       // Set Trailer Type: use appointment value if present, otherwise default to 53FT
       const trailerTypeSelect = document.getElementById('fld_trailerType');
