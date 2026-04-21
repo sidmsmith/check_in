@@ -732,7 +732,8 @@
           '--logo-display': 'block'
         },
         logo: '/kendrascott_logo.png',
-        logoMaxHeight: '126px'
+        logoMaxHeight: '126px',
+        logoMaxWidth: '300px'
       }
     };
 
@@ -751,9 +752,15 @@
         themeLogo.src = theme.logo;
         themeLogo.style.display = 'block';
         themeLogo.style.maxHeight = theme.logoMaxHeight || '50px';
+        if (theme.logoMaxWidth) {
+          themeLogo.style.maxWidth = theme.logoMaxWidth;
+        } else {
+          themeLogo.style.removeProperty('max-width');
+        }
       } else {
         themeLogo.style.display = 'none';
         themeLogo.style.maxHeight = '50px';
+        themeLogo.style.removeProperty('max-width');
       }
 
       // Save to localStorage
