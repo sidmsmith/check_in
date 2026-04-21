@@ -732,7 +732,7 @@
           '--logo-display': 'block'
         },
         logo: '/kendrascott_logo.png',
-        logoMaxHeight: '56px'
+        logoMaxHeight: '84px'
       }
     };
 
@@ -769,7 +769,9 @@
       themeList.innerHTML = '';
       const currentTheme = localStorage.getItem('selectedTheme') || 'default';
       
-      Object.entries(themes).forEach(([key, theme]) => {
+      Object.entries(themes)
+        .sort(([, a], [, b]) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+        .forEach(([key, theme]) => {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = `list-group-item list-group-item-action ${key === currentTheme ? 'active' : ''}`;
