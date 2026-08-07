@@ -182,10 +182,10 @@ def usage_track():
         
         # Must match apps_dashboard neonAppName for Check In Kiosk (appt_app)
         payload = {
+            **metadata,
             "event_name": event_name,
             "app_name": "appt-app",
             "app_version": "0.1.5",
-            **metadata,
             "timestamp": datetime.now().isoformat()
         }
         
